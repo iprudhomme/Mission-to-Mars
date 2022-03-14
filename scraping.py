@@ -1,4 +1,5 @@
 # Import Splinter and BeautifulSoup
+from signal import pthread_kill
 from splinter import Browser
 from bs4 import BeautifulSoup as soup
 import pandas as pd
@@ -12,13 +13,16 @@ def scrape_all():
 
     news_title, news_paragraph = mars_news(browser)
 
+    hemispheres = mars_hemispheres(browser)
+
     # Run all scraping functions and store results in dictionary
     data = {
         "news_title": news_title,
         "news_paragraph": news_paragraph,
         "featured_image": featured_image(browser),
         "facts": mars_facts(),
-        "last_modified": dt.datetime.now()
+        "last_modified": dt.datetime.now(),
+        "hemispheres" : hemispheres
     }
 
     browser.quit()
@@ -88,6 +92,44 @@ def mars_facts():
     df.columns=['description', 'Mars', 'Earth']
     df.set_index('description', inplace=True)
     return df.to_html()
+
+def mars_hemispheres(browser):
+    # Visit the Mars Hemisphere site
+    url = 'https://marshemispheres.com/'
+    browser.visit(url)
+
+    # Create a list to hold the images and titles.
+    hemisphere_image_urls = []
+
+    # Retrieve the image urls and titles for each hemisphere.
+    html = browser.html
+    img_soup = soup(html, 'html.parser')
+
+    try:
+        #Use the div tag to return the 4 titles and the anchor tags to the full image pages. 
+        hemispheres = img_soup.find_all('div', class_='description')
+
+        #Loop through the hemispheres
+        for hemisphere in hemispheres:
+            hemispheres_dict = {}
+            #assign the title from each description
+            title = hemisphere.h3.text
+            #use the title for the browsers' find by text option, to find the anchor tag to click
+            browser.links.find_by_partial_text(title).click() 
+            #use the find by text to find the Sample anchor and grab the href from it.
+            img_url = browser.find_by_text("Sample")["href"]
+            #save the retrieved image url and the tile to the hemispheres_dict
+            hemispheres_dict['image_url'] = img_url    
+            hemispheres_dict['title'] = title
+            #append the hemispheres_dict to the final list.
+            hemisphere_image_urls.append(hemispheres_dict)
+            browser.back()
+    except BaseException:
+        return None
+
+    #Return the list that holds the dictionary of each image url and title.
+    return hemisphere_image_urls
+
 
 if __name__ == "__main__":
    print(scrape_all())
